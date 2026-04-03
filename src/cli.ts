@@ -23,7 +23,7 @@ const conf = yargs(process.argv.slice(2))
         type: "boolean",
         description: "Generate definitions only (interfaces and types)",
     })
-    .option("modelNamePreffix", {
+    .option("modelNamePrefix", {
         type: "string",
         description: "Prefix for generated interface names",
     })
@@ -104,8 +104,8 @@ if (conf.emitDefinitionsOnly) {
     options.emitDefinitionsOnly = true;
 }
 
-if (conf.modelNamePreffix) {
-    options.modelNamePreffix = conf.modelNamePreffix;
+if (conf.modelNamePrefix) {
+    options.modelNamePrefix = conf.modelNamePrefix;
 }
 
 if (conf.modelNameSuffix) {
@@ -114,7 +114,7 @@ if (conf.modelNameSuffix) {
 
 if (conf.modelPropertyNaming) {
     if (!["camelCase", "PascalCase"].includes(conf.modelPropertyNaming)) {
-        console.error("Incorrect modelPeropertyNaming value. Use 'camelCase' or 'PascalCase'");
+        console.error("Incorrect modelPropertyNaming value. Use 'camelCase' or 'PascalCase'");
         process.exit(1);
     }
     options.modelPropertyNaming = conf.modelPropertyNaming as ModelPropertyNaming;
@@ -168,13 +168,13 @@ if (conf._ === undefined || conf._.length === 0) {
             try {
                 await parseAndGenerate(wsdlPath, path.join(outDir), options);
             } catch (err) {
-                Logger.error(`Error occured while generating client "${wsdlName}"`);
+                Logger.error(`Error occurred while generating client "${wsdlName}"`);
                 Logger.error(`\t${err}`);
                 errorsCount += 1;
             }
         }
         if (errorsCount) {
-            Logger.error(`${errorsCount} Errors occured!`);
+            Logger.error(`${errorsCount} Errors occurred!`);
             process.exit(1);
         }
     }

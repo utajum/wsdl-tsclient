@@ -1,9 +1,10 @@
-import util from "util";
+import { promisify } from "util";
+import { exec as execCb } from "child_process";
 
-const exec = util.promisify(require("child_process").exec);
+const exec = promisify(execCb);
 
 export async function typecheck(pathToIndex: string) {
-    await exec(`tsc ${pathToIndex} --noEmit`, {
+    await exec(`tsc ${pathToIndex} --noEmit --ignoreConfig --types node --skipLibCheck`, {
         env: process.env,
     });
 }

@@ -1,16 +1,16 @@
 # WSDL TSClient
 
 ![license](https://img.shields.io/npm/l/wsdl-tsclient)
-[![Known Vulnerabilities](https://snyk.io/test/github/dderevjanik/wsdl-tsclient/badge.svg)](https://snyk.io/test/github/dderevjanik/wsdl-tsclient)
+[![Known Vulnerabilities](https://snyk.io/test/github/utajum/wsdl-tsclient/badge.svg)](https://snyk.io/test/github/utajum/wsdl-tsclient)
 [![npm-version](https://img.shields.io/npm/v/wsdl-tsclient)](https://npmjs.com/package/wsdl-tsclient)
 
-**Example how to generate and use wsdl-tsclient:** [wsdl-tsclient-example](https://github.com/dderevjanik/wsdl-tsclient-example)
+**Example how to generate and use wsdl-tsclient:** [wsdl-tsclient-example](https://github.com/utajum/wsdl-tsclient-example)
 
 Generate a [soap client](https://www.npmjs.com/package/soap) with typescript definitions from a WSDL file.
 
 This library uses [ts-morph](https://www.npmjs.com/package/ts-morph) to generate typescript code and [soap](https://github.com/vpulim/node-soap) for runtime. Inspired by Java [wsimport](https://docs.oracle.com/javase/8/docs/technotes/tools/unix/wsimport.html) and [openapi-generator](https://github.com/OpenAPITools/openapi-generator).
 
-*NOTE:* Add [soap](https://www.npmjs.com/package/soap) to your npm runtime dependencies (`npm i soap`).
+_NOTE:_ Add [soap](https://www.npmjs.com/package/soap) to your npm runtime dependencies (`npm i soap`).
 
 ## Install
 
@@ -32,7 +32,7 @@ npx wsdl-tsclient ./path/to/wsdl.wsdl -o ./generated/
 
 ## Usage
 
-You can check example repository [wsdl-tsclient-example](https://github.com/dderevjanik/wsdl-tsclient-example)
+You can check example repository [wsdl-tsclient-example](https://github.com/utajum/wsdl-tsclient-example)
 
 ### Generate client using CLI
 
@@ -89,7 +89,7 @@ parseAndGenerate("./path/to/MyWsdl.wsdl", "./generated/");
 
 ### Using generated client in your project
 
-*Note:* Make sure you have [soap](https://www.npmjs.com/package/soap) package in your runtime dependencies (`npm i soap`)
+_Note:_ Make sure you have [soap](https://www.npmjs.com/package/soap) package in your runtime dependencies (`npm i soap`)
 
 ```typescript
 import { createClientAsync } from "./generated/MyWsdl";
@@ -98,7 +98,7 @@ const client = await createClientAsync("./path/to/wsdl.wsdl");
 client.CallSoapMethodAsync();
 ```
 
-Setting basic auth 
+Setting basic auth
 
 ```typescript
 import soap from "soap";
@@ -130,4 +130,4 @@ The source code is licensed under the [MIT](./LICENSE) license
 
 ## Contributors
 
-![Contributors](https://contrib.rocks/image?repo=dderevjanik/wsdl-tsclient)
+![Contributors](https://contrib.rocks/image?repo=utajum/wsdl-tsclient)

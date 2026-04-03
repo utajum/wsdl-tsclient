@@ -1,5 +1,4 @@
-import Chalk from "chalk";
-import SupportsColors from "supports-color";
+import { styleText } from "util";
 
 export class Logger {
     static isDebug = false;
@@ -17,49 +16,33 @@ export class Logger {
         Logger.isError = false;
     }
 
-    static debug(str: any) {
+    static debug(str: string) {
         if (Logger.isDebug) {
-            if (Logger.colors && SupportsColors.stdout) {
-                console.log(Chalk.grey(str));
-            } else {
-                console.log(str);
-            }
+            console.log(Logger.colors ? styleText("gray", str) : str);
         }
     }
 
-    static log(str: any) {
+    static log(str: string) {
         if (Logger.isLog) {
             console.log(str);
         }
     }
 
-    static info(str: any) {
+    static info(str: string) {
         if (Logger.isInfo) {
-            if (Logger.colors && SupportsColors.stdout) {
-                console.log(Chalk.green(str));
-            } else {
-                console.log(str);
-            }
+            console.log(Logger.colors ? styleText("green", str) : str);
         }
     }
 
-    static warn(str: any) {
+    static warn(str: string) {
         if (Logger.isWarn) {
-            if (Logger.colors && SupportsColors.stdout) {
-                console.log(Chalk.yellow(str));
-            } else {
-                console.log(str);
-            }
+            console.log(Logger.colors ? styleText("yellow", str) : str);
         }
     }
 
-    static error(str: any) {
+    static error(str: string) {
         if (Logger.isError) {
-            if (Logger.colors && SupportsColors.stderr) {
-                console.error(Chalk.red(str));
-            } else {
-                console.error(str);
-            }
+            console.error(Logger.colors ? styleText("red", str) : str);
         }
     }
 }

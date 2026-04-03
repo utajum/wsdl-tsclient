@@ -14,13 +14,13 @@ import { Logger } from "./utils/logger";
 
 export interface GeneratorOptions {
     emitDefinitionsOnly: boolean;
-    modelPropertyNaming: ModelPropertyNaming;
+    modelPropertyNaming: ModelPropertyNaming | undefined;
     esm: boolean;
 }
 
 const defaultOptions: GeneratorOptions = {
     emitDefinitionsOnly: false,
-    modelPropertyNaming: null,
+    modelPropertyNaming: undefined,
     esm: false,
 };
 
@@ -30,7 +30,7 @@ const defaultOptions: GeneratorOptions = {
 function addSafeImport(
     imports: OptionalKind<ImportDeclarationStructure>[],
     moduleSpecifier: string,
-    namedImport: string
+    namedImport: string,
 ) {
     if (!imports.find((imp) => imp.moduleSpecifier == moduleSpecifier)) {
         imports.push({
@@ -56,7 +56,7 @@ function createProperty(
     type: string,
     doc: string,
     isArray: boolean,
-    optional = true
+    optional = true,
 ): PropertySignatureStructure {
     return {
         kind: StructureKind.PropertySignature,
@@ -69,11 +69,11 @@ function createProperty(
 
 function generateDefinitionFile(
     project: Project,
-    definition: null | Definition,
+    definition: Definition,
     defDir: string,
     stack: string[],
     generated: Definition[],
-    options: GeneratorOptions
+    options: GeneratorOptions,
 ): void {
     const defName = definition.name;
     const defFilePath = path.join(defDir, `${defName}.ts`);
@@ -98,7 +98,9 @@ function generateDefinitionFile(
         }
         if (prop.kind === "PRIMITIVE") {
             // e.g. string
-            definitionProperties.push(createProperty(prop.name, prop.type, prop.description, prop.isArray));
+            definitionProperties.push(
+                createProperty(prop.name, prop.type, prop.description ?? "", prop.isArray ?? false),
+            );
         } else if (prop.kind === "REFERENCE") {
             // e.g. Items
             if (!generated.includes(prop.ref)) {
@@ -109,7 +111,7 @@ function generateDefinitionFile(
             if (prop.ref.name !== definition.name) {
                 addSafeImport(definitionImports, `./${prop.ref.name}${options.esm ? ".js" : ""}`, prop.ref.name);
             }
-            definitionProperties.push(createProperty(prop.name, prop.ref.name, prop.sourceName, prop.isArray));
+            definitionProperties.push(createProperty(prop.name, prop.ref.name, prop.sourceName, prop.isArray ?? false));
         }
     }
 
@@ -131,7 +133,7 @@ function generateDefinitionFile(
 export async function generate(
     parsedWsdl: ParsedWsdl,
     outDir: string,
-    options: Partial<GeneratorOptions>
+    options: Partial<GeneratorOptions>,
 ): Promise<void> {
     const mergedOptions: GeneratorOptions = {
         ...defaultOptions,
@@ -175,18 +177,18 @@ export async function generate(
                             defDir,
                             [method.paramDefinition.name],
                             allDefinitions,
-                            mergedOptions
+                            mergedOptions,
                         );
                         addSafeImport(
                             clientImports,
                             `./definitions/${method.paramDefinition.name}${mergedOptions.esm ? ".js" : ""}`,
-                            method.paramDefinition.name
+                            method.paramDefinition.name,
                         );
                     }
                     addSafeImport(
                         portImports,
                         `../definitions/${method.paramDefinition.name}${mergedOptions.esm ? ".js" : ""}`,
-                        method.paramDefinition.name
+                        method.paramDefinition.name,
                     );
                 }
                 if (method.returnDefinition !== null) {
@@ -198,18 +200,18 @@ export async function generate(
                             defDir,
                             [method.returnDefinition.name],
                             allDefinitions,
-                            mergedOptions
+                            mergedOptions,
                         );
                         addSafeImport(
                             clientImports,
                             `./definitions/${method.returnDefinition.name}${mergedOptions.esm ? ".js" : ""}`,
-                            method.returnDefinition.name
+                            method.returnDefinition.name,
                         );
                     }
                     addSafeImport(
                         portImports,
                         `../definitions/${method.returnDefinition.name}${mergedOptions.esm ? ".js" : ""}`,
-                        method.returnDefinition.name
+                        method.returnDefinition.name,
                     );
                 }
                 // TODO: Deduplicate PortMethods
@@ -342,7 +344,7 @@ export async function generate(
         allDefinitions.map((def) => ({
             namedExports: [def.name],
             moduleSpecifier: `./definitions/${def.name}${mergedOptions.esm ? ".js" : ""}`,
-        }))
+        })),
     );
     if (!mergedOptions.emitDefinitionsOnly) {
         // TODO: Aggregate all exports during declarations generation
@@ -357,13 +359,13 @@ export async function generate(
             parsedWsdl.services.map((service) => ({
                 namedExports: [service.name],
                 moduleSpecifier: `./services/${service.name}${mergedOptions.esm ? ".js" : ""}`,
-            }))
+            })),
         );
         indexFile.addExportDeclarations(
             parsedWsdl.ports.map((port) => ({
                 namedExports: [port.name],
                 moduleSpecifier: `./ports/${port.name}${mergedOptions.esm ? ".js" : ""}`,
-            }))
+            })),
         );
     }
 

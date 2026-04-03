@@ -1,7 +1,7 @@
 import path from "path";
 import { parseWsdl } from "./parser";
 import { generate } from "./generator";
-import { timeElapsed } from "./utils/timer";
+import { now, timeElapsed } from "./utils/timer";
 import { Logger } from "./utils/logger";
 
 export { generate } from "./generator";
@@ -21,7 +21,7 @@ export interface Options {
      * Prefix for generated interface names
      * @default ""
      */
-    modelNamePreffix: string;
+    modelNamePrefix: string;
     /**
      * Suffix for generated interface names
      * @default ""
@@ -45,7 +45,7 @@ export interface Options {
     /**
      * Property naming convention ('camelCase' or 'PascalCase')"
      */
-    modelPropertyNaming: ModelPropertyNaming;
+    modelPropertyNaming: ModelPropertyNaming | undefined;
     /**
      * Generate imports with .js suffix
      */
@@ -69,12 +69,12 @@ export interface Options {
 
 export const defaultOptions: Options = {
     emitDefinitionsOnly: false,
-    modelNamePreffix: "",
+    modelNamePrefix: "",
     modelNameSuffix: "",
     caseInsensitiveNames: false,
     useWsdlTypeNames: false,
     maxRecursiveDefinitionName: 64,
-    modelPropertyNaming: null,
+    modelPropertyNaming: undefined,
     esm: false,
     //
     verbose: false,
@@ -85,7 +85,7 @@ export const defaultOptions: Options = {
 export async function parseAndGenerate(
     wsdlPath: string,
     outDir: string,
-    options: Partial<Options> = {}
+    options: Partial<Options> = {},
 ): Promise<void> {
     const mergedOptions: Options = {
         ...defaultOptions,
@@ -108,13 +108,13 @@ export async function parseAndGenerate(
 
     // Logger.debug(`Options: ${JSON.stringify(mergedOptions, null, 2)}`);
 
-    const timeParseStart = process.hrtime();
+    const timeParseStart = now();
     const parsedWsdl = await parseWsdl(wsdlPath, mergedOptions);
-    Logger.debug(`Parser time: ${timeElapsed(process.hrtime(timeParseStart))}ms`);
+    Logger.debug(`Parser time: ${timeElapsed(timeParseStart)}ms`);
 
-    const timeGenerateStart = process.hrtime();
+    const timeGenerateStart = now();
     await generate(parsedWsdl, path.join(outDir, parsedWsdl.name.toLowerCase()), mergedOptions);
-    Logger.debug(`Generator time: ${timeElapsed(process.hrtime(timeGenerateStart))}ms`);
+    Logger.debug(`Generator time: ${timeElapsed(timeGenerateStart)}ms`);
 
-    Logger.info(`Generating finished: ${timeElapsed(process.hrtime(timeParseStart))}ms`);
+    Logger.info(`Generating finished: ${timeElapsed(timeParseStart)}ms`);
 }

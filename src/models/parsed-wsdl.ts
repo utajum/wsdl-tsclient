@@ -80,7 +80,7 @@ export interface Options {
      * @default 32
      */
     maxStackWarn: number;
-    modelNamePreffix: string;
+    modelNamePrefix: string;
     modelNameSuffix: string;
 }
 
@@ -88,7 +88,7 @@ const defaultOptions: Options = {
     caseInsensitiveNames: false,
     maxStack: 64,
     maxStackWarn: 32,
-    modelNamePreffix: "",
+    modelNamePrefix: "",
     modelNameSuffix: "",
 };
 
@@ -98,11 +98,11 @@ export class ParsedWsdl {
      * Used to generate client name of interface
      * @example "MyClient"
      */
-    name: string;
+    name!: string;
     /** Original wsdl filename */
-    wsdlFilename: string;
+    wsdlFilename!: string;
     /** Absolute basepath or url */
-    wsdlPath: string;
+    wsdlPath!: string;
 
     definitions: Array<Definition> = [];
     ports: Array<Port> = [];
@@ -120,7 +120,7 @@ export class ParsedWsdl {
     }
 
     /** Find already parsed definition by it's name */
-    findDefinition(definitionName: string): Definition {
+    findDefinition(definitionName: string): Definition | undefined {
         return this.definitions.find((def) => def.name === definitionName);
     }
 
@@ -133,14 +133,14 @@ export class ParsedWsdl {
         const definitionName = sanitizeFilename(defName);
         const isInSensitive = this._options.caseInsensitiveNames;
 
-        let defNameToCheck = `${this._options.modelNamePreffix}${definitionName}${this._options.modelNameSuffix}`;
+        let defNameToCheck = `${this._options.modelNamePrefix}${definitionName}${this._options.modelNameSuffix}`;
         if (isInSensitive) {
             defNameToCheck = defNameToCheck.toLowerCase();
         }
 
         if (
             !this.definitions.find((def) =>
-                isInSensitive ? def.name.toLowerCase() === defNameToCheck : def.name === defNameToCheck
+                isInSensitive ? def.name.toLowerCase() === defNameToCheck : def.name === defNameToCheck,
             )
         ) {
             return definitionName;
@@ -150,7 +150,7 @@ export class ParsedWsdl {
                 !this.definitions.find((def) =>
                     isInSensitive
                         ? def.name.toLowerCase() === `${defNameToCheck}${i}`.toLowerCase()
-                        : def.name === `${defNameToCheck}${i}`
+                        : def.name === `${defNameToCheck}${i}`,
                 )
             ) {
                 return `${definitionName}${i}`;
@@ -161,7 +161,7 @@ export class ParsedWsdl {
             }
         }
         throw new Error(
-            `Out of stack (${this._options.maxStack}) for "${definitionName}", there's probably cyclic definition. You can also try to increase maxStack with --TODO option`
+            `Out of stack (${this._options.maxStack}) for "${definitionName}", there's probably cyclic definition. You can also try to increase maxStack with --TODO option`,
         );
     }
 }

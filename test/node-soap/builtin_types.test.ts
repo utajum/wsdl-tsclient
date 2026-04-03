@@ -1,4 +1,4 @@
-import test from "tape";
+import { describe, it, expect } from "vitest";
 import { existsSync } from "fs";
 import { parseAndGenerate } from "../../src";
 import { Logger } from "../../src/utils/logger";
@@ -6,29 +6,24 @@ import { typecheck } from "../utils/tsc";
 
 const target = "builtin_types";
 
-test(target, async t => {
+describe(target, () => {
     Logger.disabled();
 
     const input = `./test/resources/${target}.wsdl`;
     const outdir = "./test/generated";
 
-    t.test(`${target} - generate wsdl client`, async t => {
+    it(`${target} - generate wsdl client`, async () => {
         await parseAndGenerate(input, outdir);
-        t.end();
     });
 
-    t.test(`${target} - check definitions`, async t => {
-        t.equal(existsSync(`${outdir}/builtintypes/definitions/Xsduration.ts`), true);
-        t.equal(existsSync(`${outdir}/builtintypes/definitions/XsnonNegativeInteger.ts`), true);
-        t.equal(existsSync(`${outdir}/builtintypes/definitions/XsnonNegativeInteger1.ts`), true);
-        t.equal(existsSync(`${outdir}/builtintypes/definitions/Xsstring.ts`), true);
-        t.end();
+    it(`${target} - check definitions`, async () => {
+        expect(existsSync(`${outdir}/builtintypes/definitions/Xsduration.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/builtintypes/definitions/XsnonNegativeInteger.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/builtintypes/definitions/XsnonNegativeInteger1.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/builtintypes/definitions/Xsstring.ts`)).toBe(true);
     });
 
-    t.test(`${target} - compile`, async t => {
+    it(`${target} - compile`, async () => {
         await typecheck(`${outdir}/builtintypes/index.ts`);
-		t.end();
     });
-
 });
-

@@ -1,4 +1,4 @@
-import test from "tape";
+import { describe, it, expect } from "vitest";
 import { existsSync } from "fs";
 import { parseAndGenerate } from "../../src";
 import { Logger } from "../../src/utils/logger";
@@ -6,29 +6,25 @@ import { typecheck } from "../utils/tsc";
 
 const target = "extended_element";
 
-test(target, async t => {
+describe(target, () => {
     Logger.disabled();
 
     const input = `./test/resources/${target}.wsdl`;
     const outdir = "./test/generated";
 
-    t.test(`${target} - generate wsdl client`, async t => {
+    it(`${target} - generate wsdl client`, async () => {
         await parseAndGenerate(input, outdir);
-        t.end();
     });
 
-    t.test(`${target} - check definitions`, async t => {
-        t.equal(existsSync(`${outdir}/extendedelement/definitions/DummyList.ts`), true);
-        t.equal(existsSync(`${outdir}/extendedelement/definitions/DummyRequest.ts`), true);
-        t.equal(existsSync(`${outdir}/extendedelement/definitions/DummyResponse.ts`), true);
-        t.equal(existsSync(`${outdir}/extendedelement/definitions/DummyResult.ts`), true);
-        t.equal(existsSync(`${outdir}/extendedelement/definitions/ExtendedDummyRequest.ts`), true);
-        t.end();
+    it(`${target} - check definitions`, async () => {
+        expect(existsSync(`${outdir}/extendedelement/definitions/DummyList.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/extendedelement/definitions/DummyRequest.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/extendedelement/definitions/DummyResponse.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/extendedelement/definitions/DummyResult.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/extendedelement/definitions/ExtendedDummyRequest.ts`)).toBe(true);
     });
 
-    t.test(`${target} - compile`, async t => {
+    it(`${target} - compile`, async () => {
         await typecheck(`${outdir}/extendedelement/index.ts`);
-		t.end();
     });
-
 });

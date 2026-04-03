@@ -1,6 +1,13 @@
 /**
- * Convert `process.hrtime` to `ms`
+ * Get current time in milliseconds using performance.now()
  */
-export function timeElapsed(time: [number, number]) {
-    return (time[0] * 1_000_000_000 + time[1]) / 1_000_000;
+export function now(): number {
+    return performance.now();
+}
+
+/**
+ * Get elapsed time in milliseconds since `start`
+ */
+export function timeElapsed(start: number): string {
+    return (performance.now() - start).toFixed(2);
 }

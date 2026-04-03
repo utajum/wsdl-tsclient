@@ -20,7 +20,7 @@ import { reservedKeywords } from "./utils/javascript";
 import { Logger } from "./utils/logger";
 
 interface ParserOptions {
-    modelNamePreffix: string;
+    modelNamePrefix: string;
     modelNameSuffix: string;
     maxRecursiveDefinitionName: number;
     caseInsensitiveNames: boolean;
@@ -28,7 +28,7 @@ interface ParserOptions {
 }
 
 const defaultOptions: ParserOptions = {
-    modelNamePreffix: "",
+    modelNamePrefix: "",
     modelNameSuffix: "",
     maxRecursiveDefinitionName: 64,
     caseInsensitiveNames: false,
@@ -74,7 +74,8 @@ function findElementSchemaType(definitions: DefinitionsElement, element: Element
     const type = element.$type || element.$ref;
     if (!type) return element;
     const { prefix, name: localName } = splitQName(type);
-    const ns = element.schemaXmlns[prefix] ?? definitions.xmlns[prefix] ?? definitions.xmlns[element.targetNSAlias];
+    const ns =
+        element.schemaXmlns[prefix] ?? definitions.xmlns?.[prefix] ?? definitions.xmlns?.[element.targetNSAlias!];
     const schema = definitions.schemas[ns];
     if (!schema) return element;
     const typeElement = schema.complexTypes[localName] ?? schema.types[localName];
@@ -84,11 +85,12 @@ function findElementSchemaType(definitions: DefinitionsElement, element: Element
 function findPropSchemaType(
     definitions: DefinitionsElement,
     parentElement: ElementSchema | undefined,
-    propName: string
+    propName: string,
 ): ElementSchema | undefined {
     if (!parentElement?.children) return undefined;
     for (const child of parentElement.children) {
         if (
+            child instanceof ComplexTypeElement ||
             child instanceof ChoiceElement ||
             child instanceof SequenceElement ||
             child instanceof AllElement ||
@@ -96,7 +98,9 @@ function findPropSchemaType(
             child instanceof ComplexContentElement ||
             child instanceof ExtensionElement
         ) {
-            return findPropSchemaType(definitions, child, propName);
+            const result = findPropSchemaType(definitions, child, propName);
+            if (result) return result;
+            continue;
         }
         if (child.$name === propName) {
             if (
@@ -122,6 +126,194 @@ function getNameFromSchema(element: ElementSchema | undefined) {
 }
 
 /**
+ * Fallback schema lookup: find a ComplexTypeElement by name in the schema registry.
+ * Used when findPropSchemaType returns undefined (e.g. WCF generic types where
+ * the schema tree doesn't match the node-soap resolved defParts).
+ * Searches by targetNamespace first (from defParts context), then all schemas.
+ */
+function findTypeInSchemas(
+    definitions: DefinitionsElement,
+    typeName: string,
+    targetNamespace?: string,
+): ComplexTypeElement | undefined {
+    // Prefer the namespace from defParts context
+    if (targetNamespace) {
+        const schema = definitions.schemas[targetNamespace];
+        if (schema) {
+            const ct = schema.complexTypes[typeName] ?? schema.types[typeName];
+            if (ct instanceof ComplexTypeElement) return ct;
+        }
+    }
+    // Fallback: search all schemas
+    for (const schema of Object.values(definitions.schemas)) {
+        const ct = schema.complexTypes?.[typeName] ?? schema.types?.[typeName];
+        if (ct instanceof ComplexTypeElement) return ct;
+    }
+    return undefined;
+}
+
+/**
+ * Resolve xs:extension base="..." to the base ComplexTypeElement.
+ * Walks schema children for ComplexContentElement -> ExtensionElement,
+ * then resolves the $base QName to a ComplexTypeElement in the schema registry.
+ */
+function findExtensionBase(
+    definitions: DefinitionsElement,
+    schema: ElementSchema | undefined,
+): ComplexTypeElement | undefined {
+    if (!schema?.children) return undefined;
+    for (const child of schema.children) {
+        if (child instanceof ComplexContentElement) {
+            for (const ext of child.children) {
+                if (ext instanceof ExtensionElement && ext.$base) {
+                    const { prefix, name: localName } = splitQName(ext.$base);
+                    const ns = ext.schemaXmlns[prefix] ?? ext.xmlns?.[prefix] ?? definitions.xmlns?.[prefix];
+                    if (!ns) return undefined;
+                    const baseSchema = definitions.schemas[ns];
+                    if (!baseSchema) return undefined;
+                    const baseType = baseSchema.complexTypes[localName] ?? baseSchema.types[localName];
+                    if (baseType instanceof ComplexTypeElement) return baseType;
+                    return undefined;
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Collect ElementElement entries from a type's immediate Sequence/All/Choice children.
+ * Does NOT descend into ComplexContent/Extension (those are for inheritance).
+ */
+function collectDirectElements(schema: ComplexTypeElement): ElementElement[] {
+    const elements: ElementElement[] = [];
+    function walk(children: any[] | undefined) {
+        if (!children) return;
+        for (const child of children) {
+            if (child instanceof ElementElement) {
+                elements.push(child);
+            } else if (
+                child instanceof SequenceElement ||
+                child instanceof AllElement ||
+                child instanceof ChoiceElement
+            ) {
+                walk(child.children);
+            }
+            // Skip ComplexContentElement, SimpleContentElement, ExtensionElement
+        }
+    }
+    walk(schema.children);
+    return elements;
+}
+
+/**
+ * Check if an ElementElement's $type is an XSD built-in primitive
+ * (i.e. its namespace is http://www.w3.org/2001/XMLSchema).
+ */
+function isPrimitiveXsdType(element: ElementElement, definitions: DefinitionsElement): boolean {
+    const type = element.$type;
+    if (!type) return false;
+    const { prefix } = splitQName(type);
+    const ns = element.schemaXmlns[prefix] ?? element.xmlns?.[prefix] ?? definitions.xmlns?.[prefix];
+    return ns === "http://www.w3.org/2001/XMLSchema";
+}
+
+/**
+ * Recursively walk the xs:extension inheritance chain and add inherited
+ * properties to the definition. Processes grandparent before parent so
+ * properties appear in correct inheritance order.
+ */
+function addInheritedProperties(
+    definition: Definition,
+    parsedWsdl: ParsedWsdl,
+    options: ParserOptions,
+    definitions: DefinitionsElement,
+    baseType: ComplexTypeElement,
+    stack: string[],
+    visitedDefs: Array<VisitedDefinition>,
+    defParts: { [propNameType: string]: any },
+    seen: Set<string>,
+): void {
+    // Circular inheritance guard
+    const baseId = baseType.$name ?? "";
+    if (seen.has(baseId)) return;
+    seen.add(baseId);
+
+    // Process grandparent first (multi-level inheritance)
+    const grandparent = findExtensionBase(definitions, baseType);
+    if (grandparent) {
+        addInheritedProperties(
+            definition,
+            parsedWsdl,
+            options,
+            definitions,
+            grandparent,
+            stack,
+            visitedDefs,
+            defParts,
+            seen,
+        );
+    }
+
+    // Collect direct elements from this base type
+    const baseElements = collectDirectElements(baseType);
+    for (const elem of baseElements) {
+        const propName = elem.$name;
+        if (!propName) continue;
+
+        // Skip if child type already defines this property (child overrides parent)
+        if (propName in defParts || `${propName}[]` in defParts) continue;
+        // Skip if already added from a higher ancestor
+        if (definition.properties.some((p) => p.name === propName)) continue;
+
+        const isArray = elem.$maxOccurs === "unbounded";
+
+        if (isPrimitiveXsdType(elem, definitions)) {
+            definition.properties.push({
+                kind: "PRIMITIVE",
+                name: propName,
+                sourceName: propName,
+                description: elem.$type || "string",
+                type: toPrimitiveType(elem.$type || "string"),
+                isArray,
+            });
+        } else {
+            // Complex type - resolve schema element and recurse
+            const resolvedSchema = findElementSchemaType(definitions, elem);
+            if (resolvedSchema) {
+                const subDefinition = parseDefinition(
+                    parsedWsdl,
+                    options,
+                    getNameFromSchema(resolvedSchema) ?? propName,
+                    {},
+                    [...stack, propName],
+                    visitedDefs,
+                    definitions,
+                    resolvedSchema,
+                );
+                definition.properties.push({
+                    kind: "REFERENCE",
+                    name: propName,
+                    sourceName: propName,
+                    ref: subDefinition,
+                    isArray,
+                });
+            } else {
+                // Fallback: treat as string primitive
+                definition.properties.push({
+                    kind: "PRIMITIVE",
+                    name: propName,
+                    sourceName: propName,
+                    description: elem.$type || "string",
+                    type: "string",
+                    isArray,
+                });
+            }
+        }
+    }
+}
+
+/**
  * parse definition
  * @param parsedWsdl context of parsed wsdl
  * @param name name of definition, will be used as name of interface
@@ -137,7 +329,7 @@ function parseDefinition(
     stack: string[],
     visitedDefs: Array<VisitedDefinition>,
     definitions: DefinitionsElement,
-    schema: ElementSchema | undefined
+    schema: ElementSchema | undefined,
 ): Definition {
     const defName = changeCase(name, { pascalCase: true });
 
@@ -151,7 +343,7 @@ function parseDefinition(
         throw e;
     }
     const definition: Definition = {
-        name: `${options.modelNamePreffix}${changeCase(nonCollisionDefName, { pascalCase: true })}${
+        name: `${options.modelNamePrefix}${changeCase(nonCollisionDefName, { pascalCase: true })}${
             options.modelNameSuffix
         }`,
         sourceName: name,
@@ -167,12 +359,27 @@ function parseDefinition(
         if ("undefined" in defParts && defParts.undefined === undefined) {
             // TODO: problem while parsing WSDL, maybe report to node-soap
             // TODO: add flag --FailOnWsdlError
-            Logger.error({
-                message: "Problem while generating a definition file",
-                path: stack.join("."),
-                parts: defParts,
-            });
+            Logger.error(
+                `Problem while generating a definition file at ${stack.join(".")}: ${JSON.stringify(defParts)}`,
+            );
         } else {
+            // Resolve inherited properties from xs:extension base type.
+            // node-soap only flattens base properties into top-level message parts;
+            // for nested types used as sub-properties, defParts is missing inherited fields.
+            const baseType = findExtensionBase(definitions, schema);
+            if (baseType) {
+                addInheritedProperties(
+                    definition,
+                    parsedWsdl,
+                    options,
+                    definitions,
+                    baseType,
+                    stack,
+                    visitedDefs,
+                    defParts,
+                    new Set(),
+                );
+            }
             Object.entries(defParts).forEach(([propName, type]) => {
                 if (propName === "targetNSAlias") {
                     definition.docs.push(`@targetNSAlias \`${type}\``);
@@ -216,8 +423,11 @@ function parseDefinition(
                             });
                         } else {
                             try {
-                                const propSchema = findPropSchemaType(definitions, schema, stripedPropName);
-                                const guessPropName = getNameFromSchema(propSchema) ?? stripedPropName;
+                                const propSchema =
+                                    findPropSchemaType(definitions, schema, stripedPropName) ??
+                                    findTypeInSchemas(definitions, stripedPropName, type?.targetNamespace);
+                                const guessPropName =
+                                    (options.useWsdlTypeNames && getNameFromSchema(propSchema)) || stripedPropName;
                                 const subDefinition = parseDefinition(
                                     parsedWsdl,
                                     options,
@@ -226,7 +436,7 @@ function parseDefinition(
                                     [...stack, propName],
                                     visitedDefs,
                                     definitions,
-                                    propSchema
+                                    propSchema,
                                 );
                                 definition.properties.push({
                                     kind: "REFERENCE",
@@ -237,7 +447,7 @@ function parseDefinition(
                                 });
                             } catch (err) {
                                 const e = new Error(
-                                    `Error while parsing Subdefinition for '${stack.join(".")}.${name}'`
+                                    `Error while parsing Subdefinition for '${stack.join(".")}.${name}'`,
                                 );
                                 throw e;
                             }
@@ -279,8 +489,11 @@ function parseDefinition(
                         });
                     } else {
                         try {
-                            const propSchema = findPropSchemaType(definitions, schema, propName);
-                            const guessPropName = getNameFromSchema(propSchema) ?? propName;
+                            const propSchema =
+                                findPropSchemaType(definitions, schema, propName) ??
+                                findTypeInSchemas(definitions, propName, type?.targetNamespace);
+                            const guessPropName =
+                                (options.useWsdlTypeNames && getNameFromSchema(propSchema)) || propName;
                             const subDefinition = parseDefinition(
                                 parsedWsdl,
                                 options,
@@ -289,7 +502,7 @@ function parseDefinition(
                                 [...stack, propName],
                                 visitedDefs,
                                 definitions,
-                                propSchema
+                                propSchema,
                             );
                             definition.properties.push({
                                 kind: "REFERENCE",
@@ -339,7 +552,7 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                 const parsedWsdl = new ParsedWsdl({
                     maxStack: options.maxRecursiveDefinitionName,
                     caseInsensitiveNames: options.caseInsensitiveNames,
-                    modelNamePreffix: options.modelNamePreffix,
+                    modelNamePrefix: options.modelNamePrefix,
                     modelNameSuffix: options.modelNameSuffix,
                 });
                 const filename = path.basename(wsdlPath);
@@ -366,21 +579,17 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
 
                             // TODO: Deduplicate code below by refactoring it to external function. Is it even possible ?
                             let requestParamName = "request";
-                            let inputDefinition: Definition = null; // default type
+                            let inputDefinition: Definition | null = null; // default type
                             if (method.input) {
                                 if (method.input.$name) {
                                     requestParamName = method.input.$name;
                                 }
-                                const inputMessage = wsdl.definitions.messages[method.input.$name];
+                                const inputMessage = wsdl.definitions.messages[method.input.$name!];
                                 if (inputMessage.element) {
                                     // TODO: if `$type` not defined, inline type into function declartion (do not create definition file) - wsimport
-                                    const typeName = inputMessage.element.$type ?? inputMessage.element.$name;
-                                    const type = parsedWsdl.findDefinition(
-                                        inputMessage.element.$type ?? inputMessage.element.$name
-                                    );
-                                    const schema = mergedOptions.useWsdlTypeNames
-                                        ? findElementSchemaType(wsdl.definitions, inputMessage.element)
-                                        : undefined;
+                                    const typeName = (inputMessage.element.$type ?? inputMessage.element.$name)!;
+                                    const type = parsedWsdl.findDefinition(typeName);
+                                    const schema = findElementSchemaType(wsdl.definitions, inputMessage.element);
                                     inputDefinition =
                                         type ??
                                         parseDefinition(
@@ -391,7 +600,7 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                                             [typeName],
                                             visitedDefinitions,
                                             wsdl.definitions,
-                                            schema
+                                            schema,
                                         );
                                 } else if (inputMessage.parts) {
                                     const type = parsedWsdl.findDefinition(requestParamName);
@@ -405,29 +614,27 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                                             [requestParamName],
                                             visitedDefinitions,
                                             wsdl.definitions,
-                                            undefined
+                                            undefined,
                                         );
                                 } else {
                                     Logger.debug(
-                                        `Method '${serviceName}.${portName}.${methodName}' doesn't have any input defined`
+                                        `Method '${serviceName}.${portName}.${methodName}' doesn't have any input defined`,
                                     );
                                 }
                             }
 
                             let responseParamName = "response";
-                            let outputDefinition: Definition = null; // default type, `{}` or `unknown` ?
+                            let outputDefinition: Definition | null = null; // default type, `{}` or `unknown` ?
                             if (method.output) {
                                 if (method.output.$name) {
                                     responseParamName = method.output.$name;
                                 }
-                                const outputMessage = wsdl.definitions.messages[method.output.$name];
+                                const outputMessage = wsdl.definitions.messages[method.output.$name!];
                                 if (outputMessage.element) {
                                     // TODO: if `$type` not defined, inline type into function declartion (do not create definition file) - wsimport
-                                    const typeName = outputMessage.element.$type ?? outputMessage.element.$name;
+                                    const typeName = (outputMessage.element.$type ?? outputMessage.element.$name)!;
                                     const type = parsedWsdl.findDefinition(typeName);
-                                    const schema = mergedOptions.useWsdlTypeNames
-                                        ? findElementSchemaType(wsdl.definitions, outputMessage.element)
-                                        : undefined;
+                                    const schema = findElementSchemaType(wsdl.definitions, outputMessage.element);
                                     outputDefinition =
                                         type ??
                                         parseDefinition(
@@ -438,7 +645,7 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                                             [typeName],
                                             visitedDefinitions,
                                             wsdl.definitions,
-                                            schema
+                                            schema,
                                         );
                                 } else {
                                     const type = parsedWsdl.findDefinition(responseParamName);
@@ -452,7 +659,7 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                                             [responseParamName],
                                             visitedDefinitions,
                                             wsdl.definitions,
-                                            undefined
+                                            undefined,
                                         );
                                 }
                             }
@@ -489,7 +696,7 @@ export async function parseWsdl(wsdlPath: string, options: Partial<ParserOptions
                 parsedWsdl.ports = allPorts;
 
                 return resolve(parsedWsdl);
-            }
+            },
         );
     });
 }

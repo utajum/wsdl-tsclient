@@ -1,4 +1,4 @@
-import test from "tape";
+import { describe, it, expect } from "vitest";
 import { existsSync } from "fs";
 import { parseAndGenerate } from "../../src";
 import { Logger } from "../../src/utils/logger";
@@ -6,28 +6,24 @@ import { typecheck } from "../utils/tsc";
 
 const target = "include_with_duplicated_namespace";
 
-test(target, async t => {
+describe(target, () => {
     Logger.disabled();
 
     const input = `./test/resources/${target}.wsdl`;
     const outdir = "./test/generated";
 
-    t.test(`${target} - generate wsdl client`, async t => {
+    it(`${target} - generate wsdl client`, async () => {
         await parseAndGenerate(input, outdir);
-        t.end();
     });
 
-    t.test(`${target} - check definitions`, async t => {
-        t.equal(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyList.ts`), true);
-        t.equal(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyResponse.ts`), true);
-        t.equal(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyResult.ts`), true);
-        t.equal(existsSync(`${outdir}/includewithduplicatednamespace/definitions/ExtendedDummyRequest.ts`), true);
-        t.end();
+    it(`${target} - check definitions`, async () => {
+        expect(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyList.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyResponse.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/includewithduplicatednamespace/definitions/DummyResult.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/includewithduplicatednamespace/definitions/ExtendedDummyRequest.ts`)).toBe(true);
     });
 
-    t.test(`${target} - compile`, async t => {
+    it(`${target} - compile`, async () => {
         await typecheck(`${outdir}/includewithduplicatednamespace/index.ts`);
-		t.end();
     });
-
 });
