@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test fixture for xs:extension inheritance resolution.
+  Mirrors the Brightree WIP state pattern:
+  - LookupValue base type with primitive properties (ID, Value)
+  - WIPStates extends LookupValue with empty sequence
+  - ArrayOfWIPStates wraps WIPStates as unbounded element
+  - ServiceResponse base type with primitive Success field
+  - FetchResponse extends ServiceResponse, adds Items (ArrayOfWIPStates)
+  - Multi-level nesting: Message -> FetchResponse -> Items -> WIPStates[]
+-->
+<wsdl:definitions
+    name="ExtensionInheritanceService"
+    targetNamespace="http://example.com/ext-inherit"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://example.com/ext-inherit"
+    xmlns:common="http://example.com/ext-inherit/common">
+
+  <wsdl:types>
+    <!-- Common namespace: base types -->
+    <xs:schema
+        targetNamespace="http://example.com/ext-inherit/common"
+        xmlns:xs="http://www.w3.org/2001/XMLSchema"
+        elementFormDefault="qualified">
+
+      <xs:complexType name="LookupValue">
+        <xs:sequence>
+          <xs:element name="ID" type="xs:int" minOccurs="0"/>
+          <xs:element name="Value" nillable="true" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="ServiceResponse">
+        <xs:sequence>
+          <xs:element name="Success" type="xs:boolean" minOccurs="0"/>
+          <xs:element name="ErrorMessage" nillable="true" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+      </xs:complexType>
+    </xs:schema>
+
+    <!-- Main namespace: derived types -->
+    <xs:schema
+        targetNamespace="http://example.com/ext-inherit"
+        xmlns:xs="http://www.w3.org/2001/XMLSchema"
+        xmlns:tns="http://example.com/ext-inherit"
+        xmlns:common="http://example.com/ext-inherit/common"
+        elementFormDefault="qualified">
+
+      <!-- WIPStates extends LookupValue (cross-namespace, empty extension) -->
+      <xs:complexType name="WIPStates">
+        <xs:complexContent mixed="false">
+          <xs:extension base="common:LookupValue">
+            <xs:sequence/>
+          </xs:extension>
+        </xs:complexContent>
+      </xs:complexType>
+
+      <xs:complexType name="ArrayOfWIPStates">
+        <xs:sequence>
+          <xs:element name="WIPStates" nillable="true" type="tns:WIPStates"
+                      minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      </xs:complexType>
+
+      <!-- FetchResponse extends ServiceResponse (cross-namespace, adds Items) -->
+      <xs:complexType name="FetchResponse">
+        <xs:complexContent mixed="false">
+          <xs:extension base="common:ServiceResponse">
+            <xs:sequence>
+              <xs:element name="Items" nillable="true" type="tns:ArrayOfWIPStates" minOccurs="0"/>
+            </xs:sequence>
+          </xs:extension>
+        </xs:complexContent>
+      </xs:complexType>
+
+      <xs:element name="WIPStatesFetchAllResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="WIPStatesFetchAllResult" nillable="true"
+                        type="tns:FetchResponse" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="WIPStatesFetchAll">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Credential" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:schema>
+  </wsdl:types>
+
+  <wsdl:message name="WIPStatesFetchAllRequest">
+    <wsdl:part name="parameters" element="tns:WIPStatesFetchAll"/>
+  </wsdl:message>
+  <wsdl:message name="WIPStatesFetchAllResponse">
+    <wsdl:part name="parameters" element="tns:WIPStatesFetchAllResponse"/>
+  </wsdl:message>
+
+  <wsdl:portType name="IReferenceDataService">
+    <wsdl:operation name="WIPStatesFetchAll">
+      <wsdl:input message="tns:WIPStatesFetchAllRequest"/>
+      <wsdl:output message="tns:WIPStatesFetchAllResponse"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <wsdl:binding name="BasicHttpBinding" type="tns:IReferenceDataService">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="WIPStatesFetchAll">
+      <soap:operation soapAction="http://example.com/WIPStatesFetchAll" style="document"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="ReferenceDataService">
+    <wsdl:port name="BasicHttpPort" binding="tns:BasicHttpBinding">
+      <soap:address location="http://localhost:8080/ReferenceDataService"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
