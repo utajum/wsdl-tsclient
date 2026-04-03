@@ -1,10 +1,8 @@
 # WSDL TSClient
 
-![license](https://img.shields.io/npm/l/wsdl-tsclient)
+![license](https://img.shields.io/npm/l/@utajum/wsdl-tsclient)
 [![Known Vulnerabilities](https://snyk.io/test/github/utajum/wsdl-tsclient/badge.svg)](https://snyk.io/test/github/utajum/wsdl-tsclient)
-[![npm-version](https://img.shields.io/npm/v/wsdl-tsclient)](https://npmjs.com/package/wsdl-tsclient)
-
-**Example how to generate and use wsdl-tsclient:** [wsdl-tsclient-example](https://github.com/utajum/wsdl-tsclient-example)
+[![npm-version](https://img.shields.io/npm/v/@utajum/wsdl-tsclient)](https://npmjs.com/package/@utajum/wsdl-tsclient)
 
 Generate a [soap client](https://www.npmjs.com/package/soap) with typescript definitions from a WSDL file.
 
@@ -15,24 +13,22 @@ _NOTE:_ Add [soap](https://www.npmjs.com/package/soap) to your npm runtime depen
 ## Install
 
 ```sh
-npm i wsdl-tsclient
+npm i @utajum/wsdl-tsclient
 ```
 
 or install it with `-g` to have CLI globally available.
 
 ```sh
-npm i -g wsdl-tsclient
+npm i -g @utajum/wsdl-tsclient
 ```
 
 or you can use `npx` to run it without installing
 
 ```sh
-npx wsdl-tsclient ./path/to/wsdl.wsdl -o ./generated/
+npx @utajum/wsdl-tsclient ./path/to/wsdl.wsdl -o ./generated/
 ```
 
 ## Usage
-
-You can check example repository [wsdl-tsclient-example](https://github.com/utajum/wsdl-tsclient-example)
 
 ### Generate client using CLI
 
@@ -45,7 +41,7 @@ path to output directory (`-o` param). If you want to generate **only typescript
 
 you can also use `npx`
 
-`npx wsdl-tsclient ./soap.wsdl -o ./generated`
+`npx @utajum/wsdl-tsclient ./soap.wsdl -o ./generated`
 
 ```bash
 wsdl-tsclient [options] [path]
@@ -82,7 +78,7 @@ Examples:
 ### Generate client programmatically
 
 ```typescript
-import { generateClient } from "wsdl-tsclient";
+import { generateClient } from "@utajum/wsdl-tsclient";
 
 parseAndGenerate("./path/to/MyWsdl.wsdl", "./generated/");
 ```
