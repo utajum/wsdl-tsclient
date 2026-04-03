@@ -25,18 +25,20 @@ describe(target, () => {
 
     it(`${target} - WipStates has inherited ID and Value from LookupValue`, async () => {
         const content = readFileSync(`${defDir}/WipStates.ts`, "utf-8");
-        expect(content.includes("ID")).toBeTruthy();
-        expect(content.includes("Value")).toBeTruthy();
-        // ID should be number (from xs:int), not string
-        expect(content.includes("number")).toBeTruthy();
+        // The original bug produced `export interface WipStates {}` — empty,
+        // because xs:extension inheritance was not resolved. The fix must
+        // generate actual property declarations inherited from LookupValue.
+        expect(content).toMatch(/ID\?:\s*number/);
+        expect(content).toMatch(/Value\?:\s*string/);
     });
 
     it(`${target} - WipStatesFetchAllResult has inherited Success and ErrorMessage from ServiceResponse`, async () => {
         const content = readFileSync(`${defDir}/WipStatesFetchAllResult.ts`, "utf-8");
-        expect(content.includes("Success")).toBeTruthy();
-        expect(content.includes("ErrorMessage")).toBeTruthy();
-        // Also has its own Items property from the extension
-        expect(content.includes("Items")).toBeTruthy();
+        // Inherited from ServiceResponse base type
+        expect(content).toMatch(/Success\?:\s*boolean/);
+        expect(content).toMatch(/ErrorMessage\?:\s*string/);
+        // Own property added by the extension
+        expect(content).toMatch(/Items\?/);
     });
 
     it(`${target} - compile`, async () => {
