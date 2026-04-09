@@ -1,6 +1,10 @@
-import camelcase, { type Options } from "camelcase";
+import camelcase from "camelcase";
 
-export function changeCase(input: string, options?: Options) {
+interface CaseOptions {
+    pascalCase?: boolean;
+}
+
+export function changeCase(input: string, options?: CaseOptions) {
     if (!options?.pascalCase) {
         return input.replace(/\./g, ""); // need to remove dots in the input string, otherwise, code generation fails
     }
