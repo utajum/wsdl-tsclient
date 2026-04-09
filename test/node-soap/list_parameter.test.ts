@@ -47,8 +47,8 @@ describe(target, () => {
         expect(existsSync(`${outdir}/listparameter/definitions/GetFlexiTimecodeResult.ts`)).toBe(true);
         expect(existsSync(`${outdir}/listparameter/definitions/GetFreeDimInformation.ts`)).toBe(true);
         expect(existsSync(`${outdir}/listparameter/definitions/GetFreeDimInformationResponse.ts`)).toBe(true);
-        expect(existsSync(`${outdir}/listparameter/definitions/GetIdsParameters.ts`)).toBe(true);
-        expect(existsSync(`${outdir}/listparameter/definitions/GetIdsParametersResponse.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/listparameter/definitions/GetIDsParameters.ts`)).toBe(true);
+        expect(existsSync(`${outdir}/listparameter/definitions/GetIDsParametersResponse.ts`)).toBe(true);
         expect(existsSync(`${outdir}/listparameter/definitions/GetResourceIdFromLoggedInUser.ts`)).toBe(true);
         expect(existsSync(`${outdir}/listparameter/definitions/GetResourceIdFromLoggedInUserResponse.ts`)).toBe(true);
         expect(existsSync(`${outdir}/listparameter/definitions/GetResourceIdFromLoggedInUserResult.ts`)).toBe(true);
